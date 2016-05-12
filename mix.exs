@@ -15,7 +15,13 @@ defmodule ExStripZip.Mixfile do
   #
   # Type "mix help compile.app" for more information
   def application do
-    [applications: [:logger]]
+    [
+      applications: [:logger],
+      env: [
+        mix_env: Mix.env(),
+        version: Mix.Project.config() |> Keyword.get(:version)
+      ]
+    ]
   end
 
   # Dependencies can be Hex packages:

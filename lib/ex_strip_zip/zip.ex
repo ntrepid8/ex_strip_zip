@@ -1,14 +1,15 @@
 defmodule ExStripZip.Zip do
   require Logger
+  alias ExStripZip.Util
   @exclude_list [
     "asn1",
     "crypto",
     "runtime_tools"
   ]
 
-  def main({switches, ["zip", lib_path], errs}) do
-    case {switches, ["zip", lib_path], errs} do
-      {[], ["zip", lib_path], []} -> do_zip_libs(lib_path)
+  def main({switches, argv, errs}) do
+    case {switches, argv, errs} do
+      {[], ["zip", lib_path], []} -> run_zip_libs(lib_path)
       _                           -> show_help()
     end
   end
@@ -16,18 +17,27 @@ defmodule ExStripZip.Zip do
   def show_help() do
     IO.puts """
 
-    Usage: ex_strip_zip zip [PATH_TO_LIBS]
+    Usage: ex_strip_zip zip [PATH_TO_RELEASE]
     """
   end
 
-  def do_zip_libs(erl_lib_path) do
-    Logger.debug("zipping erl_lib_path")
+  def run_zip_libs(erl_release_path) do
+    Logger.debug("zipping erl_release_path")
+    {:ok, erl_lib_path} = lookup_lib_folder(erl_release_path)
     erl_lib_list = File.ls!(erl_lib_path)
-    {:ok, before_bytes} = get_disk_usage(erl_lib_path) 
+    {:ok, before_bytes} = Util.get_disk_usage(erl_lib_path)
     zip_libs(erl_lib_list, erl_lib_path)
-    {:ok, after_bytes} = get_disk_usage(erl_lib_path)
+    {:ok, after_bytes} = Util.get_disk_usage(erl_lib_path)
     Logger.info("success")
-    Logger.debug("{before, after, difference}: {#{bytes_to_mb(before_bytes)}M, #{bytes_to_mb(after_bytes)}M, #{bytes_to_mb(after_bytes-before_bytes)}M}")
+    Logger.debug("{before, after, difference}: {#{Util.bytes_to_mb(before_bytes)}M, #{Util.bytes_to_mb(after_bytes)}M, #{Util.bytes_to_mb(after_bytes-before_bytes)}M}")
+  end
+
+  def lookup_lib_folder(erl_release_path) do
+    expected_lib_path = "#{erl_release_path}/lib"
+    case File.dir?(expected_lib_path) do
+      true  -> {:ok, expected_lib_path}
+      false -> {:error, "not a directory: #{expected_lib_path}"}
+    end
   end
 
   def zip_libs([], _cwd), do: :ok
@@ -41,28 +51,13 @@ defmodule ExStripZip.Zip do
         zip_libs(tail, cwd)
       true ->
         zip_path = "#{cwd}/#{head}.ez"
-        {:ok, before_bytes} = get_disk_usage("#{cwd}/#{head}")
+        {:ok, before_bytes} = Util.get_disk_usage("#{cwd}/#{head}")
         {:ok, created_zip_path} = convert_to_zip_lib(zip_path, head, cwd)
-        {:ok, after_bytes} = get_disk_usage(zip_path)
+        {:ok, after_bytes} = Util.get_disk_usage(zip_path)
         verify_zip_file(zip_path)
-        Logger.debug("{before, after, difference}: {#{bytes_to_mb(before_bytes)}M, #{bytes_to_mb(after_bytes)}M, #{bytes_to_mb(after_bytes-before_bytes)}M}")
+        Logger.debug("{before, after, difference}: {#{Util.bytes_to_mb(before_bytes)}M, #{Util.bytes_to_mb(after_bytes)}M, #{Util.bytes_to_mb(after_bytes-before_bytes)}M}")
         zip_libs(tail, cwd)
     end
-  end
-
-  def get_disk_usage(path) do
-    case System.cmd("du", ["-s", "#{path}"]) do
-      {resp, 0} ->
-        [bytes, _target_path] = String.split(resp, "\t", pargs: 2, trim: true)
-        {:ok, String.to_integer(bytes)}
-      {reason, err_code} ->
-        {:error, reason, err_code}
-    end
-  end
-
-  def bytes_to_mb(bytes) do
-    bytes/:math.pow(2, 10)
-    |> Float.round(2)
   end
 
   def convert_to_zip_lib(zip_path, lib_name, cwd) do

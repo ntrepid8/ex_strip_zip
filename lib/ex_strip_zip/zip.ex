@@ -2,9 +2,9 @@ defmodule ExStripZip.Zip do
   require Logger
   alias ExStripZip.Util
   @exclude_list [
-    "asn1",
-    "crypto",
-    "runtime_tools"
+    "asn1-",
+    "crypto-",
+    "runtime_tools-"
   ]
 
   def main({switches, argv, errs}) do
@@ -85,7 +85,7 @@ defmodule ExStripZip.Zip do
 
   def exlude?([], _lib_name), do: false
   def exlude?([head|tail], lib_name) do
-    case String.contains?(lib_name, head) do
+    case String.starts_with?(lib_name, head) do
       false -> exlude?(tail, lib_name)
       true  -> true
     end

@@ -3,7 +3,7 @@ defmodule ExStripZip.Mixfile do
 
   def project do
     [app: :ex_strip_zip,
-     version: "0.0.2",
+     version: "0.1.0",
      elixir: "~> 1.2",
      escript: [main_module: ExStripZip],
      build_embedded: Mix.env == :prod,

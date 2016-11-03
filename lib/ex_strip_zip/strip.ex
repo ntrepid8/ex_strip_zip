@@ -18,10 +18,11 @@ defmodule ExStripZip.Strip do
   end
 
   def run_strip_libs(erl_release_path) do
-    Logger.debug("stripping erl_release_path")
+    Logger.debug("stripping #{inspect erl_release_path}")
     erl_lib_list = File.ls!(erl_release_path)
     {:ok, before_bytes} = Util.get_disk_usage(erl_release_path)
     {:ok, modules} = strip_release(erl_release_path)
+    :ok = remove_extras(erl_release_path)
     {:ok, after_bytes} = Util.get_disk_usage(erl_release_path)
     Logger.info("success")
     Logger.debug("{before, after, difference}: {#{Util.bytes_to_mb(before_bytes)}M, #{Util.bytes_to_mb(after_bytes)}M, #{Util.bytes_to_mb(after_bytes-before_bytes)}M}")
@@ -70,6 +71,24 @@ defmodule ExStripZip.Strip do
       false -> exlude?(tail, lib_name)
       true  -> true
     end
+  end
+
+  def remove_extras(erl_release_path) do
+    {:ok, libraries} = File.ls("#{erl_release_path}/lib/")
+    remove_extras_helper(libraries, "#{erl_release_path}/lib", "examples")
+    remove_extras_helper(libraries, "#{erl_release_path}/lib", "src")
+    remove_extras_helper(libraries, "#{erl_release_path}/lib", "c_src")
+    :ok
+  end
+
+  def remove_extras_helper([], _, _), do: :ok
+  def remove_extras_helper([head|tail], base_path, extra_target) do
+    target_path = "#{base_path}/#{head}/#{extra_target}"
+    if File.exists?(target_path) do
+      {:ok, removed_paths} = File.rm_rf(target_path)
+      Logger.debug("removed_paths: #{inspect removed_paths}")
+    end
+    remove_extras_helper(tail, base_path, extra_target)
   end
   
 end
